@@ -8,38 +8,48 @@ data "aws_ami" "al2023" {
   }
 }
 
-resource "aws_security_group" "app" {
-  name        = "secure-pipeline-ec2"
-  description = "App instance"
+resource "aws_iam_role" "ec2" {
+  name = "secure-pipeline-ec2"
 
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "ec2.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+resource "aws_iam_role_policy_attachment" "ec2_ssm" {
+  role       = aws_iam_role.ec2.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "ec2" {
+  name = "secure-pipeline-ec2"
+  role = aws_iam_role.ec2.name
 }
 
 resource "aws_instance" "app" {
-  ami                         = data.aws_ami.al2023.id
-  instance_type               = var.instance_type
-  vpc_security_group_ids      = [aws_security_group.app.id]
-  associate_public_ip_address = true
+  ami                  = data.aws_ami.al2023.id
+  instance_type        = var.instance_type
+  iam_instance_profile = aws_iam_instance_profile.ec2.name
+  monitoring           = true
+  ebs_optimized        = true
 
   metadata_options {
-    http_tokens = "optional"
+    http_endpoint = "enabled"
+    http_tokens   = "required"
   }
 
   root_block_device {
-    encrypted = false
+    encrypted = true
   }
 
   tags = { Name = "secure-pipeline-ec2" }
+
+  lifecycle {
+    ignore_changes = [ami]
+  }
 }
