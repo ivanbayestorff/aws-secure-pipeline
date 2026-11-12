@@ -1,4 +1,3 @@
-/*
 data "aws_ami" "al2023" {
   most_recent = true
   owners      = ["amazon"]
@@ -54,4 +53,3 @@ resource "aws_instance" "app" {
     ignore_changes = [ami]
   }
 }
-*/
